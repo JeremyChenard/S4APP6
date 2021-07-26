@@ -64,7 +64,7 @@
 #define b2 (2)
 #define a0 (3)
 #define a1 (4)
-#define a2 (3)
+#define a2 (5)
 
 void ADC1_Initialize (void)
 {
@@ -149,7 +149,7 @@ void __ISR ( _ADC_VECTOR, IPL1AUTO ) ADC_1 (void)
 			// v[n] = b1 * x[n] + a1 * y[n] + u[n-1]
             IIRv[nSOS] = (IIRCoeffs[nSOS][b1] * x)  + (-IIRCoeffs[nSOS][a1] * y) + IIRu[nSOS]; // v -> Q2.28
 			// u[n] = b2 * x[n] + a2 * y[n]
-            IIRu[nSOS] = (IIRCoeffs[nSOS][b2] * x) + (IIRCoeffs[nSOS][a2] * y); // u -> Q2.28
+            IIRu[nSOS] = (IIRCoeffs[nSOS][b2] * x) + (-IIRCoeffs[nSOS][a2] * y); // u -> Q2.28
             // Update the input for the next SOS section
             x = y;
         }
