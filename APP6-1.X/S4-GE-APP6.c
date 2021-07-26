@@ -232,12 +232,10 @@ int main(void) {
                     inFFT[n].im = 0;
                 }
                 
-                // MOI -----> Ajouters calculs
                 // *** POINT A2: calculate frequency spectrum components X[k] with PIC32 DSP Library FFT function call
                 mips_fft32_setup(twiddles, LOG2FFTLEN);
                 mips_fft32(outFFT, inFFT, twiddles, Scratch, LOG2FFTLEN);
                 
-                // MOI -----> Ajouters calculs
                 // *** POINT A3: Calculate power spectrum 10log(|X[k]|^2) in dB,
                 //               add "1" to log() operand to avoid division by zero,
                 //               store in "debugBuffer1".
@@ -304,20 +302,50 @@ int main(void) {
                 //                of the built-in division by N in the PIC32 DSP Library implementation
                 //                of the FFT algorithm (See DS51685E, p.118), else roundoff error 
                 //                decreases resolution of X[k] result.
+                // currentInBuffer -> Q.15
+                for (n = 0; n < H_LEN; n++) {
+                    inFFT[n].re = currentInBuffer[n+SIG_LEN];
+//                    inFFT[n].re = currentInBuffer[n+SIG_LEN] >> LOG2FFTLEN;
+//                    inFFT[n].re = (currentInBuffer[n+SIG_LEN] * window[n+SIG_LEN]) >> (H_and_W_QXY_RES_NBITS - LOG2FFTLEN);
+                    inFFT[n].im = 0;
+                }
+                
+                for (; n < FFT_LEN; n++) {
+//                    inFFT[n].re = (previousInBuffer[n] * window[n]) >> (H_and_W_QXY_RES_NBITS - LOG2FFTLEN);
+//                    inFFT[n].re = previousInBuffer[n] >> LOG2FFTLEN;
+                    inFFT[n].re = previousInBuffer[n-H_LEN];
+                    inFFT[n].im = 0;
+                }
+                
 
                 // *** POINT B1: Calculate X[k] with PIC32 DSP Library FFT function call
-    
-                
+                mips_fft32_setup(twiddles, LOG2FFTLEN);
+                mips_fft32(outFFT, inFFT, twiddles, Scratch, LOG2FFTLEN);
+//                
                 // *** POINT B2: FIR Filtering, calculate Y* = (HX)*
                 // (instead of Y=HX, in preparation for inverse FFT using forward FFT library function call)
-
+//                for (k = 0; k < FFT_LEN; k++) {
+//                    signalOut_Y[k].re = (outFFT[k].re * Htot[k].re) >> (H_and_W_QXY_RES_NBITS - LOG2FFTLEN);
+//                    signalOut_Y[k].im = (outFFT[k].im * Htot[k].im) >> (H_and_W_QXY_RES_NBITS - LOG2FFTLEN);
+//                }
+                for (k = 0; k < FFT_LEN; k++) {
+                    signalOut_Y[k].re = (outFFT[k].im * Htot[k].im);
+                    signalOut_Y[k].im = (outFFT[k].re * Htot[k].re);
+                }
                     
                 // *** POINT B3: Inverse FFT by forward FFT library function call, no need to divide by N
-   
+                mips_fft32_setup(twiddles, LOG2FFTLEN);
+                mips_fft32(signalOut_y, signalOut_Y, twiddles, Scratch, LOG2FFTLEN);
                 
                 // *** POINT B4: Extract real part of the inverse FFT result and remove H QX.Y scaling,
-				// discard first block as per the "Overlap-and-save" method.
-
+				// discard first block as per the "Overlap-and-save" method.                
+//                for (n = H_LEN; n < FFT_LEN; n++)
+//                {
+//                    currentOutBuffer[n - H_LEN] = signalOut_y[n].re << H_and_W_QXY_RES_NBITS;
+//                }
+                for (n = H_LEN; n < FFT_LEN; n++) {
+                    currentOutBuffer[n - H_LEN] = signalOut_y[n].im;
+                }
                 
                 // If required, update LCD display with SW7-SW3 switch states
                 if (switchStateChange) {
