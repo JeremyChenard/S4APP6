@@ -58,6 +58,13 @@
   Section: Driver Interface
 */
 
+#define b0 (0)
+#define b1 (1)
+#define b2 (2)
+#define a0 (3)
+#define a1 (4)
+#define a2 (3)
+
 void ADC1_Initialize (void)
 {
     // ASAM enabled; DONE disabled; CLRASAM disabled; FORM Signed Integer 32-bit; SAMP disabled; SSRC TMR3; SIDL disabled; ON enabled; 
@@ -134,13 +141,14 @@ void __ISR ( _ADC_VECTOR, IPL1AUTO ) ADC_1 (void)
         y = x;
          for (nSOS = 0; nSOS < N_SOS_SECTIONS; nSOS++) {
             // *** POINT C1
-            
-			// y[n] = 
-			
-			// v[n] = 
-			
-			// u[n] = 
-            
+            // IIRCoeffs : coefficients (b0, b1, b2, a0, a1, a2) for N_SOS_SECTIONS cascaded SOS sections
+			// y[n] = b0 * x[n] + v[n-1]
+            y = (IIRCoeffs[nSOS][b0] * x) + IIRv[nSOS];
+            y >>= 13; // Format Q15
+			// v[n] = b1 * x[n] + a1 * y[n] + u[n-1]
+            IIRv[nSOS] = (IIRCoeffs[nSOS][b1] * x)  + (-IIRCoeffs[nSOS][a1] * y) + IIRu[nSOS];
+			// u[n] = b2 * x[n] + a2 * y[n]
+            IIRu[nSOS] = (IIRCoeffs[nSOS][b2] * x) + (IIRCoeffs[nSOS][a2] * y);
             // Update the input for the next SOS section
             x = y;
         }
