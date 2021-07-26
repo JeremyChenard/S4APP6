@@ -80,7 +80,7 @@ bool inputBufferFull, IIREnabled;
 // Though this is BAD PROGRAMMING PRACTICE, define these arrays as
 // static (private) global variables for the MPLAB DMCI plug-in to see them
 static int32_t inBuffer1[SIG_LEN], inBuffer2[SIG_LEN], outBuffer1[SIG_LEN], outBuffer2[SIG_LEN],
-        debugBuffer1[FFT_LEN], debugBuffer2[FFT_LEN], Fe;
+        debugBuffer1[FFT_LEN], debugBuffer2[FFT_LEN], debugBuffer3[FFT_LEN], Fe;
 static int32c inFFT[FFT_LEN], outFFT[FFT_LEN], Htot[FFT_LEN], twiddles[FFT_LEN / 2], signalOut_Y[FFT_LEN], signalOut_y[FFT_LEN];;
 
 // Local function prototyping
@@ -120,7 +120,7 @@ int main(void) {
     Fe = PeripheralClockFrequency / PR3;
 
     // Calculate spectral resolution, use (double) type casting for parameters
-    // *** POINT A1: spectralResolution =...
+    // *** POINT A1:
     spectralResolution = ((double)Fe)/((double)FFT_LEN);
 
 
@@ -304,47 +304,41 @@ int main(void) {
                 //                decreases resolution of X[k] result.
                 // currentInBuffer -> Q.15
                 for (n = 0; n < H_LEN; n++) {
-                    inFFT[n].re = currentInBuffer[n+SIG_LEN];
-//                    inFFT[n].re = currentInBuffer[n+SIG_LEN] >> LOG2FFTLEN;
-//                    inFFT[n].re = (currentInBuffer[n+SIG_LEN] * window[n+SIG_LEN]) >> (H_and_W_QXY_RES_NBITS - LOG2FFTLEN);
+                    inFFT[n].re = currentInBuffer[n+512] << LOG2FFTLEN;
                     inFFT[n].im = 0;
                 }
                 
                 for (; n < FFT_LEN; n++) {
-//                    inFFT[n].re = (previousInBuffer[n] * window[n]) >> (H_and_W_QXY_RES_NBITS - LOG2FFTLEN);
-//                    inFFT[n].re = previousInBuffer[n] >> LOG2FFTLEN;
-                    inFFT[n].re = previousInBuffer[n-H_LEN];
+                    inFFT[n].re = previousInBuffer[n-H_LEN] << LOG2FFTLEN;
                     inFFT[n].im = 0;
                 }
-                
 
                 // *** POINT B1: Calculate X[k] with PIC32 DSP Library FFT function call
-                mips_fft32_setup(twiddles, LOG2FFTLEN);
                 mips_fft32(outFFT, inFFT, twiddles, Scratch, LOG2FFTLEN);
-//                
+               
+                for (n = 0; n < FFT_LEN; n++) {
+                    debugBuffer2[n] = outFFT[n].re ;
+                }
                 // *** POINT B2: FIR Filtering, calculate Y* = (HX)*
                 // (instead of Y=HX, in preparation for inverse FFT using forward FFT library function call)
-//                for (k = 0; k < FFT_LEN; k++) {
-//                    signalOut_Y[k].re = (outFFT[k].re * Htot[k].re) >> (H_and_W_QXY_RES_NBITS - LOG2FFTLEN);
-//                    signalOut_Y[k].im = (outFFT[k].im * Htot[k].im) >> (H_and_W_QXY_RES_NBITS - LOG2FFTLEN);
-//                }
                 for (k = 0; k < FFT_LEN; k++) {
-                    signalOut_Y[k].re = (outFFT[k].im * Htot[k].im);
-                    signalOut_Y[k].im = (outFFT[k].re * Htot[k].re);
+                    signalOut_Y[k].re = (outFFT[k].re * Htot[k].re);
+                    signalOut_Y[k].im = -(outFFT[k].im * Htot[k].im);
                 }
+                
+//                Tester la réponse impulsionnelle
+//                for (n = 0; n < FFT_LEN; n++) {
+//                    debugBuffer3[n] = Htot[n].re;
+//                }
                     
                 // *** POINT B3: Inverse FFT by forward FFT library function call, no need to divide by N
-                mips_fft32_setup(twiddles, LOG2FFTLEN);
                 mips_fft32(signalOut_y, signalOut_Y, twiddles, Scratch, LOG2FFTLEN);
                 
                 // *** POINT B4: Extract real part of the inverse FFT result and remove H QX.Y scaling,
 				// discard first block as per the "Overlap-and-save" method.                
-//                for (n = H_LEN; n < FFT_LEN; n++)
-//                {
-//                    currentOutBuffer[n - H_LEN] = signalOut_y[n].re << H_and_W_QXY_RES_NBITS;
-//                }
                 for (n = H_LEN; n < FFT_LEN; n++) {
-                    currentOutBuffer[n - H_LEN] = signalOut_y[n].im;
+                    previousOutBuffer[n - H_LEN] = signalOut_y[n].re >> H_and_W_QXY_RES_NBITS;
+//                    debugBuffer1[n - H_LEN] = signalOut_y[n].re >> H_and_W_QXY_RES_NBITS;
                 }
                 
                 // If required, update LCD display with SW7-SW3 switch states
