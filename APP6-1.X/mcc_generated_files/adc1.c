@@ -144,12 +144,11 @@ void __ISR ( _ADC_VECTOR, IPL1AUTO ) ADC_1 (void)
             // *** POINT C1
             // IIRCoeffs : coefficients (b0, b1, b2, a0, a1, a2) for N_SOS_SECTIONS cascaded SOS sections
 			// y[n] = b0 * x[n] + v[n-1]
-            y = (IIRCoeffs[nSOS][b0] * x) + IIRv[nSOS]; // y -> Q2.28
-            y /= 8192; // Passer de format Q2.28 à Q15 en divisant par 2^13
+            y = ((IIRCoeffs[nSOS][b0] * x) + IIRv[nSOS]) >> 13; // y -> Q2.28
 			// v[n] = b1 * x[n] + a1 * y[n] + u[n-1]
-            IIRv[nSOS] = (IIRCoeffs[nSOS][b1] * x)  + (-IIRCoeffs[nSOS][a1] * y) + IIRu[nSOS]; // v -> Q2.28
+            IIRv[nSOS] = (IIRCoeffs[nSOS][b1] * x) - (IIRCoeffs[nSOS][a1] * y) + IIRu[nSOS]; // v -> Q2.28
 			// u[n] = b2 * x[n] + a2 * y[n]
-            IIRu[nSOS] = (IIRCoeffs[nSOS][b2] * x) + (-IIRCoeffs[nSOS][a2] * y); // u -> Q2.28
+            IIRu[nSOS] = (IIRCoeffs[nSOS][b2] * x) - (IIRCoeffs[nSOS][a2] * y); // u -> Q2.28
             // Update the input for the next SOS section
             x = y;
         }
